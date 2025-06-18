@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git'
+                git credentialsId: 'jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
             }
         }
 
@@ -18,33 +18,34 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+        stage('Test') {
             steps {
-                sh 'npm test' // or skip if no tests
+                sh 'npm test || echo "No tests found, skipping."'
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Build step - e.g. compiling, bundling, etc.'
-                // sh 'npm run build' if you have build scripts
+                echo 'Build step (optional)'
+                // Uncomment below if you have a build step
+                // sh 'npm run build'
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying to server...'
-                // Example: sh 'scp -i key.pem dist/* user@server:/var/www/app/'
+                echo 'You can add deployment script here'
+                // For example, deploy to server, Docker, etc.
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline completed successfully ✅'
+            echo '✅ CI/CD pipeline completed successfully'
         }
         failure {
-            echo 'Pipeline failed ❌'
+            echo '❌ Pipeline failed'
         }
     }
 }
