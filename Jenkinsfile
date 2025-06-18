@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:18'
-        }
-    }
+     agent { label 'Slave' }
 
     environment {
         NODE_ENV = "production"
@@ -12,30 +8,32 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
+                git credentialsId: 'Git-jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
             }
         }
 
         stage('Install Dependencies') {
             steps {
+                sh 'ls -al'                    // Debug: list files
+                sh 'cat package.json'          // Debug: confirm it's there
                 sh 'npm install'
             }
         }
 
-        stage('Run App') {
+        stage('Start App') {
             steps {
                 sh 'npm start &'
-                echo 'App started!'
+                echo 'Node app started successfully.'
             }
         }
     }
 
     post {
         success {
-            echo '✅ CI/CD pipeline completed successfully'
+            echo '✅ Pipeline completed successfully'
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo '❌ Pipeline failed. Check logs above.'
         }
     }
 }
