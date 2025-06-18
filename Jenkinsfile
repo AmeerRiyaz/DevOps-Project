@@ -1,5 +1,9 @@
 pipeline {
-     agent { label 'Slave' }
+    agent {
+        docker {
+            image 'node:18'
+        }
+    }
 
     environment {
         NODE_ENV = "production"
