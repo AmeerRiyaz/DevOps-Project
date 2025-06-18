@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+     agent {
+        label "Slave"
+    }
     // This pipeline is designed to clone a Git repository, install dependencies, and run a Node.js application.
 
     environment {
