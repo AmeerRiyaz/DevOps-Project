@@ -1,9 +1,6 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:18' // Pulls Node.js with npm
-        }
-    }
+    agent any
+    // This pipeline is designed to clone a Git repository, install dependencies, and run a Node.js application.
 
     environment {
         NODE_ENV = 'production'
