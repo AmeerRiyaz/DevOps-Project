@@ -1,0 +1,15 @@
+{
+  "name": "nodeapp",
+  "version": "1.0.0",
+  "description": "DevOps Project Setup and Test",
+  "main": "app/app.js",
+  "scripts": {
+    "start": "node app/app.js",
+    "test": "echo \"No test cases defined\""
+  },
+  "author": "Ameer Riyaz",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

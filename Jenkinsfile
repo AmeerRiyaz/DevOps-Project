@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:18'
+        }
+    }
 
     environment {
         NODE_ENV = "production"
@@ -24,18 +28,10 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Run app.js') {
             steps {
-                echo 'Build step (optional)'
-                // Uncomment below if you have a build step
-                // sh 'npm run build'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'You can add deployment script here'
-                // For example, deploy to server, Docker, etc.
+                sh 'node app.js &'
+                echo 'App started successfully'
             }
         }
     }
