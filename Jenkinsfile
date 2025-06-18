@@ -1,33 +1,43 @@
 pipeline {
     agent {
         docker {
-            image 'node:18'
+            image 'node:18' // Pulls Node.js with npm
         }
     }
 
     environment {
-        NODE_ENV = "production"
+        NODE_ENV = 'production'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Initialize') {
             steps {
-                git credentialsId: 'Git-jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
+                echo 'Starting the pipeline...'
+            }
+        }
+        stage('Clone Repository') {
+            steps {
+                git credentialsId: 'jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
+            }
+        }
+
+        stage('Verify Checkout') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh 'ls -al'                    // Debug: list files
-                sh 'cat package.json'          // Debug: confirm it's there
                 sh 'npm install'
             }
         }
 
-        stage('Start App') {
+        stage('Run App') {
             steps {
                 sh 'npm start &'
-                echo 'Node app started successfully.'
+                echo 'App started.'
             }
         }
     }
@@ -37,7 +47,7 @@ pipeline {
             echo '✅ Pipeline completed successfully'
         }
         failure {
-            echo '❌ Pipeline failed. Check logs above.'
+            echo '❌ Pipeline failed.'
         }
     }
 }
