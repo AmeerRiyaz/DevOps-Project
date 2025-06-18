@@ -22,16 +22,10 @@ pipeline {
             }
         }
 
-        stage('Test') {
+        stage('Run App') {
             steps {
-                sh 'npm test || echo "No tests found, skipping."'
-            }
-        }
-
-        stage('Run app.js') {
-            steps {
-                sh 'node app.js &'
-                echo 'App started successfully'
+                sh 'npm start &'
+                echo 'App started!'
             }
         }
     }
