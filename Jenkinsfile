@@ -1,10 +1,10 @@
 pipeline {
-    agent any
-    // This pipeline is designed to clone a Git repository, install dependencies, and run a Node.js application.
+    agent any  // Change to agent { label 'your-slave-label' } if using a specific agent
 
     environment {
         NODE_ENV = 'production'
-        NODE_VERSION = '18.20.2'  // Set your desired Node.js version
+        NODE_VERSION = '16' // Change this to the Node.js version you want to use
+        NVM_DIR = "${HOME}/.nvm"
     }
 
     stages {
@@ -16,49 +16,34 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-                git credentialsId: 'jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
+                git credentialsId: 'Git-jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
             }
         }
 
-        stage('Install Node.js') {
-            steps {
-                sh '''
-                    # Install nvm if not already present
-                    export NVM_DIR="$HOME/.nvm"
-                    if [ ! -d "$NVM_DIR" ]; then
-                        echo "Installing NVM..."
-                        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-                    fi
-
-                    # Load NVM
-                    export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-                    # Install Node.js and set default
-                    nvm install $NODE_VERSION
-                    nvm use $NODE_VERSION
-                    nvm alias default $NODE_VERSION
-
-                    # Add node and npm to PATH for future steps
-                    echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
-                    echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
-                '''
-            }
-        }
-
-        stage('Verify Checkout') {
+        stage('Show Files') {
             steps {
                 sh 'pwd'
                 sh 'ls -la'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install Node and Dependencies') {
             steps {
                 sh '''
                     export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                    if [ ! -d "$NVM_DIR" ]; then
+                        echo "🔧 Installing NVM..."
+                        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                    fi
+
+                    # Load nvm
+                    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+
+                    echo "📦 Installing Node.js version $NODE_VERSION..."
+                    nvm install $NODE_VERSION
                     nvm use $NODE_VERSION
+
+                    echo "📥 Installing npm dependencies..."
                     npm install
                 '''
             }
@@ -68,21 +53,22 @@ pipeline {
             steps {
                 sh '''
                     export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
                     nvm use $NODE_VERSION
-                    npm start &
+
+                    echo "▶️ Running the app..."
+                    nohup npm start &
                 '''
-                echo '🎯 App started.'
             }
         }
     }
 
     post {
         success {
-            echo '✅ Pipeline completed successfully'
+            echo '✅ CI/CD pipeline completed successfully'
         }
         failure {
-            echo '❌ Pipeline failed.'
+            echo '❌ Pipeline failed'
         }
     }
 }
