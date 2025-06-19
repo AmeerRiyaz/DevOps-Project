@@ -1,12 +1,29 @@
 stages:
+  - pre
   - test
   - build
   - deploy
 
+#  Clean environment before anything starts
+pre_clean:
+  stage: pre
+  tags:
+    - linux
+  script:
+    - echo " Cleaning up Docker containers, images, and Node.js..."
+    - pkill node || true
+    - docker ps -q | xargs -r docker stop || true
+    - docker ps -aq | xargs -r docker rm || true
+    - docker images -q myapp:latest | xargs -r docker rmi -f || true
+    - echo " Cleanup completed."
+
+#  Test Job
 test_job:
   stage: test
   tags:
     - linux
+  needs:
+    - job: pre_clean
   script:
     - echo "Running tests..."
     - mkdir -p test-results
@@ -17,6 +34,7 @@ test_job:
       - test-results/
     expire_in: 1 week
 
+#  Build Job (basic)
 build_job:
   stage: build
   tags:
@@ -33,6 +51,7 @@ build_job:
       - build/
     expire_in: 1 week
 
+#  Build Job with Node
 build_job1:
   stage: build
   tags:
@@ -50,6 +69,7 @@ build_job1:
       else
         echo "Node.js is already installed: $(node -v)"
       fi
+    - pkill node || true
     - node -v
     - npm -v
     - cd app && npm install
@@ -62,6 +82,7 @@ build_job1:
       - build1/
     expire_in: 1 week
 
+#  Docker Build + Run
 deploy_job:
   stage: deploy
   tags:
@@ -84,18 +105,24 @@ deploy_job:
     - echo "Deployment completed successfully."
   after_script:
     - echo "Cleaning up after deployment..."
-    - docker ps -a
     - docker ps -q | xargs -r docker stop
     - docker ps -aq | xargs -r docker rm
     - docker rmi -f myapp:latest || true
     - echo "Cleanup completed successfully."
 
+#  Docker Compose Deployment
 deploy_job1:
   stage: deploy
   tags:
     - linux
   needs:
     - job: deploy_job
+  before_script:
+    - echo "Cleaning up Docker Compose environment..."
+    - docker-compose -f docker-compose.yml down || true
+    - docker ps -q | xargs -r docker stop || true
+    - docker ps -aq | xargs -r docker rm || true
+    - docker images -q myapp:latest | xargs -r docker rmi -f || true
   script:
     - echo "Deploying the project using Docker Compose..."
     - docker-compose -f docker-compose.yml up -d
@@ -105,6 +132,7 @@ deploy_job1:
     - echo "Cleaning up after deployment..."
     - docker-compose -f docker-compose.yml down
 
+#  Push to Docker Hub
 deploy_job2:
   stage: deploy
   tags:
@@ -114,14 +142,17 @@ deploy_job2:
   before_script:
     - echo "Logging into Docker Hub..."
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    - docker ps -q | xargs -r docker stop || true
+    - docker ps -aq | xargs -r docker rm || true
+    - docker images -q myapp:latest | xargs -r docker rmi -f || true
   script:
     - echo "Deploying the project and pushing to Docker Hub..."
     - cd app
-    - echo "Building the Docker image..."
     - docker build -t myapp:latest .
     - docker tag myapp:latest docker.io/$DOCKER_USERNAME/myapp:latest
     - docker push docker.io/$DOCKER_USERNAME/myapp:latest
 
+#  Pull + Run from Docker Hub
 deploy_job3:
   stage: deploy
   tags:
@@ -131,6 +162,9 @@ deploy_job3:
   before_script:
     - echo "Logging into Docker Hub..."
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    - docker ps -q | xargs -r docker stop || true
+    - docker ps -aq | xargs -r docker rm || true
+    - docker images -q myapp:latest | xargs -r docker rmi -f || true
   script:
     - echo "Pulling and running the image from Docker Hub..."
     - docker pull docker.io/$DOCKER_USERNAME/myapp:latest
