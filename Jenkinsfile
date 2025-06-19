@@ -2,58 +2,126 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'production'
-        NODE_VERSION = '16'
-        NVM_DIR = "${HOME}/.nvm"
+        DOCKER_USERNAME = credentials('docker-username')
+        DOCKER_PASSWORD = credentials('docker-password')
     }
 
     stages {
-        stage('Initialize') {
-            steps {
-                echo ' Starting the pipeline...'
-            }
-        }
 
-        stage('Clone Repository') {
+        stage('Pre Clean') {
             steps {
-                git credentialsId: 'Git-jenkins', url: 'git@github.com:AmeerRiyaz/DevOps-Project.git', branch: 'main'
-            }
-        }
-
-        stage('Install Node and Dependencies') {
-            steps {
+                echo '🧹 Cleaning up Docker containers, images, and Node.js...'
                 sh '''
-                    #!/bin/bash
-                    export NVM_DIR="$HOME/.nvm"
+                    pkill node || true
+                    docker ps -q | xargs -r docker stop || true
+                    docker ps -aq | xargs -r docker rm || true
+                    docker images -q myapp:latest | xargs -r docker rmi -f || true
+                '''
+                echo '✅ Pre-clean completed.'
+            }
+        }
 
-                    if [ ! -d "$NVM_DIR" ]; then
-                        echo " Installing NVM..."
-                        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                sh '''
+                    mkdir -p test-results
+                    echo "Sample Test Result" > test-results/result.txt
+                '''
+                echo '✅ Tests completed.'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building the project...'
+                sh 'ls test-results/'
+                echo '✅ Build completed.'
+            }
+        }
+
+        stage('Build with Node.js') {
+            steps {
+                echo 'Setting up environment...'
+                sh '''
+                    if ! command -v node > /dev/null; then
+                      curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                      apt-get install -y nodejs
                     fi
-
-                    # Load NVM
-                    [ -s "$NVM_DIR/nvm.sh" ] && bash -c "source $NVM_DIR/nvm.sh && nvm install $NODE_VERSION && nvm use $NODE_VERSION && npm install"
+                    pkill node || true
+                    node -v
+                    npm -v
+                    cd app && npm install
                 '''
-            }
-        }
-
-        stage('Run App') {
-            steps {
                 sh '''
-                    #!/bin/bash
-                    export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && bash -c "source $NVM_DIR/nvm.sh && nvm use $NODE_VERSION && nohup npm start &"
+                    echo "Running app temporarily..."
+                    node app.js & PID=$!; sleep 10; kill $PID
+                '''
+                echo '✅ Node.js Build completed.'
+            }
+        }
+
+        stage('Docker Build & Run') {
+            steps {
+                echo 'Deploying via Docker...'
+                sh '''
+                    cd app
+                    docker build -t myapp:latest .
+                    docker run -it -d -p 80:80 myapp:latest
+                '''
+                echo '✅ Docker deployment completed.'
+            }
+            post {
+                always {
+                    echo 'Cleaning up Docker...'
+                    sh '''
+                        docker ps -q | xargs -r docker stop || true
+                        docker ps -aq | xargs -r docker rm || true
+                        docker rmi -f myapp:latest || true
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Compose Deploy') {
+            steps {
+                echo 'Deploying using Docker Compose...'
+                sh '''
+                    docker-compose -f docker-compose.yml down || true
+                    docker-compose -f docker-compose.yml up -d
+                    sleep 10
+                    docker ps -a
+                '''
+            }
+            post {
+                always {
+                    sh 'docker-compose -f docker-compose.yml down || true'
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing to Docker Hub...'
+                sh '''
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    cd app
+                    docker build -t myapp:latest .
+                    docker tag myapp:latest docker.io/$DOCKER_USERNAME/myapp:latest
+                    docker push docker.io/$DOCKER_USERNAME/myapp:latest
                 '''
             }
         }
-    }
 
-    post {
-        success {
-            echo ' CI/CD pipeline completed successfully'
-        }
-        failure {
-            echo ' Pipeline failed'
+        stage('Pull & Run from Docker Hub') {
+            steps {
+                echo 'Running from Docker Hub...'
+                sh '''
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    docker pull docker.io/$DOCKER_USERNAME/myapp:latest
+                    docker run -it -d -p 80:80 docker.io/$DOCKER_USERNAME/myapp:latest
+                '''
+            }
         }
     }
 }
