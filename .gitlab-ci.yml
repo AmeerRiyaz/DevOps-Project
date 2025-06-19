@@ -1,0 +1,137 @@
+stages:
+  - test
+  - build
+  - deploy
+
+test_job:
+  stage: test
+  tags:
+    - linux
+  script:
+    - echo "Running tests..."
+    - mkdir -p test-results
+    - echo "Sample Test Result" > test-results/result.txt
+    - echo "Tests completed successfully."
+  artifacts:
+    paths:
+      - test-results/
+    expire_in: 1 week
+
+build_job:
+  stage: build
+  tags:
+    - linux
+  needs:
+    - job: test_job
+      artifacts: true
+  script:
+    - echo "Building the project..."
+    - ls test-results/
+    - echo "Build completed successfully."
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 week
+
+build_job1:
+  stage: build
+  tags:
+    - linux
+  needs:
+    - job: build_job
+      artifacts: true
+  before_script:
+    - echo "Setting up environment..."
+    - |
+      if ! command -v node &> /dev/null; then
+        echo "Node.js not found. Installing Node.js..."
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt-get install -y nodejs
+      else
+        echo "Node.js is already installed: $(node -v)"
+      fi
+    - node -v
+    - npm -v
+    - cd app && npm install
+  script:
+    - echo "Running app temporarily..."
+    - node app.js & PID=$!; sleep 10; kill $PID
+    - echo "Build completed successfully."
+  artifacts:
+    paths:
+      - build1/
+    expire_in: 1 week
+
+deploy_job:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: build_job1
+  before_script:
+    - echo "Preparing for deployment..."
+    - |
+      if ! command -v docker &> /dev/null; then
+        echo "Docker not found. Installing Docker..."
+        apt-get update && apt-get install -y docker.io
+      else
+        echo "Docker is already installed: $(docker --version)"
+      fi
+  script:
+    - cd app
+    - docker build -t myapp:latest .
+    - docker run -it -d -p 80:80 myapp:latest
+    - echo "Deployment completed successfully."
+  after_script:
+    - echo "Cleaning up after deployment..."
+    - docker ps -a
+    - docker ps -q | xargs -r docker stop
+    - docker ps -aq | xargs -r docker rm
+    - docker rmi -f myapp:latest || true
+    - echo "Cleanup completed successfully."
+
+deploy_job1:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: deploy_job
+  script:
+    - echo "Deploying the project using Docker Compose..."
+    - docker-compose -f docker-compose.yml up -d
+    - sleep 10
+    - docker ps -a
+  after_script:
+    - echo "Cleaning up after deployment..."
+    - docker-compose -f docker-compose.yml down
+
+deploy_job2:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: deploy_job1
+  before_script:
+    - echo "Logging into Docker Hub..."
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  script:
+    - echo "Deploying the project and pushing to Docker Hub..."
+    - cd app
+    - echo "Building the Docker image..."
+    - docker build -t myapp:latest .
+    - docker tag myapp:latest docker.io/$DOCKER_USERNAME/myapp:latest
+    - docker push docker.io/$DOCKER_USERNAME/myapp:latest
+
+deploy_job3:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: deploy_job2
+  before_script:
+    - echo "Logging into Docker Hub..."
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  script:
+    - echo "Pulling and running the image from Docker Hub..."
+    - docker pull docker.io/$DOCKER_USERNAME/myapp:latest
+    - docker run -it -d -p 80:80 docker.io/$DOCKER_USERNAME/myapp:latest
